@@ -43,7 +43,7 @@
 <body>
 <header>
   <h1>서면실사 진행현황 대시보드</h1>
-  <div class="sub">생성: 2026-06-18 13:10</div>
+  <div class="sub">생성: 2026-06-18 13:13</div>
 </header>
 <div class="wrap">
   <div class="cards" id="cards"></div>
@@ -154,15 +154,26 @@ const verifiers = latest.rows.filter(r => (r.total||0) > 0).map(r => r.name);
     const required = (daysLeft!==null && daysLeft>0) ? remaining/daysLeft : null;
     const actual = haveVel ? (vel[r.name]||0) : null;
 
+    // 마감 임박 기준일(D-5 이내) — 이 안쪽이면 같은 상황도 한 단계 더 심각하게 본다
+    const NEAR = 5;
+    const near = (daysLeft!==null && daysLeft<=NEAR);
     let level='ok', reason='완료/정상';
+
     if(remaining===0){ level='ok'; reason='입력 완료'; }
     else if(daysLeft!==null && daysLeft<0){ level='danger'; reason='기한 초과'; }
-    else if((r.answered_q||0)===0){ level='danger'; reason='착수 전'; }
-    else if(required!==null && actual!==null && actual<=0){ level='danger'; reason='최근 진척 없음'; }
-    else if(required!==null && actual!==null && actual<required){
-      level = (required/actual>=2) ? 'danger' : 'warn'; reason='속도 부족';
+    else if((r.answered_q||0)===0){
+      // 착수 전: 마감 임박이면 심각, 여유 있으면 주의
+      level = near ? 'danger' : 'warn'; reason = near ? '착수 전·마감 임박' : '착수 전';
     }
-    else if(required!==null && required>0 && ansRate<50 && daysLeft!==null && daysLeft<=7){
+    else if(required!==null && actual!==null){
+      if(actual<=0){
+        // 최근 진척 없음: 마감 임박이면 심각, 여유 있으면 주의
+        level = near ? 'danger' : 'warn'; reason = near ? '진척 없음·마감 임박' : '최근 진척 없음';
+      } else if(required/actual >= 1.5){ level='danger'; reason='속도 크게 부족'; }
+      else if(actual < required){ level='warn'; reason='속도 부족'; }
+    }
+    else if(near && ansRate<60){
+      // 마감일은 있으나 속도 계산 불가(스냅샷 부족) — 마감 임박 + 진척 낮으면 주의
       level='warn'; reason='마감 임박';
     }
     return {name:r.name, remaining, ansRate, deadline:r.deadline, daysLeft, required, actual, level, reason};
