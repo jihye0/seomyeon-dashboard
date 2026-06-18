@@ -40,9 +40,7 @@
   td.score { font-weight:700; }
   table.risk th.sortable { cursor:pointer; user-select:none; }
   .risk-controls { display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-bottom:10px; }
-  table.risk th.filter { padding:4px 6px; background:#fff; border-bottom:2px solid var(--line); }
-  .risk-fil { width:100%; min-width:64px; padding:3px 6px; font-size:12px;
-              border:1px solid var(--line); border-radius:4px; box-sizing:border-box; }
+  input.risk-search { padding:6px 10px; border:1px solid var(--line); border-radius:6px; font-size:14px; }
   .badge { display:inline-block; padding:2px 8px; border-radius:999px; font-size:12px; font-weight:700; }
   .badge.danger { background:#fdecea; color:var(--todo); }
   .badge.warn   { background:#fff4e0; color:#b35a00; }
@@ -56,7 +54,7 @@
 <body>
 <header>
   <h1>서면실사 진행현황 대시보드</h1>
-  <div class="sub">생성: 2026-06-18 14:53</div>
+  <div class="sub">생성: 2026-06-18 14:56</div>
 </header>
 <div class="wrap">
   <div class="cards" id="cards"></div>
@@ -223,7 +221,6 @@ const verifiers = latest.rows.filter(r => (r.total||0) > 0).map(r => r.name);
     ['speed',           '실사 속도<br>(문항/일)', true ],
   ];
   const lvOrder = {danger:0, warn:1, ok:2, good:3, done:4};
-  const FILT = {name:'text', level:'level'};   // 그 외는 숫자(num)
   let sortKey = 'score', sortAsc = false;
 
   function compare(a, b){
@@ -236,35 +233,13 @@ const verifiers = latest.rows.filter(r => (r.total||0) > 0).map(r => r.name);
     return sortAsc ? va-vb : vb-va;
   }
 
-  // 숫자 필터: ">=100", "<50", ">0", "=0", 또는 그냥 "100"(= 이상)
-  function numMatch(val, expr){
-    expr = (expr||'').trim();
-    if(!expr) return true;
-    if(val===null||val===undefined) return false;
-    const m = expr.match(/^(>=|<=|>|<|=)?\s*(-?\d+(?:\.\d+)?)$/);
-    if(!m) return true;
-    const op = m[1]||'>=', n = parseFloat(m[2]);
-    if(op==='>=') return val>=n;
-    if(op==='<=') return val<=n;
-    if(op==='>')  return val>n;
-    if(op==='<')  return val<n;
-    return val==n;
-  }
-
   function renderBody(){
-    const fil = {};
-    COLS.forEach(([k])=>{ const el=document.getElementById('fil-'+k); fil[k]= el ? el.value : ''; });
-
-    let list = items.filter(i=>{
-      for(const [k] of COLS){
-        const f = fil[k]; if(!f) continue;
-        const t = FILT[k] || 'num';
-        if(t==='text'){ if(!i.name.toLowerCase().includes(f.trim().toLowerCase())) return false; }
-        else if(t==='level'){ if(i.level!==f) return false; }
-        else { if(!numMatch(i[k], f)) return false; }
-      }
-      return true;
-    });
+    const lvFilter = document.getElementById('riskLevelFilter').value;
+    const q = document.getElementById('riskSearch').value.trim().toLowerCase();
+    let list = items.filter(i =>
+      (lvFilter==='' || i.level===lvFilter) &&
+      (q==='' || i.name.toLowerCase().includes(q))
+    );
     list.sort(compare);
 
     document.getElementById('riskTbody').innerHTML =
@@ -281,36 +256,36 @@ const verifiers = latest.rows.filter(r => (r.total||0) > 0).map(r => r.name);
           <td>${i.speed===null?'-':i.speed}</td>
         </tr>`).join('');
 
-    // 정렬 화살표 갱신
     COLS.forEach(([k])=>{
       const sp = document.getElementById('arr-'+k);
       if(sp) sp.textContent = (k===sortKey) ? (sortAsc?' ▲':' ▼') : '';
     });
   }
 
-  // 머리글(제목) 행 + 필터 행 — 한 번만 만들고 본문(tbody)만 갱신해 입력 포커스 유지
+  // 머리글은 한 번만 만들고 본문(tbody)만 갱신
   const titleRow = COLS.map(([k,label])=>
     `<th class="sortable" data-key="${k}">${label}<span id="arr-${k}"></span></th>`).join('');
-  const filterRow = COLS.map(([k])=>{
-    const t = FILT[k] || 'num';
-    if(t==='text') return `<th class="filter"><input class="risk-fil" id="fil-${k}" type="text" placeholder="검색"></th>`;
-    if(t==='level') return `<th class="filter"><select class="risk-fil" id="fil-${k}">`
-      + `<option value="">전체</option><option value="danger">🔴 심각</option><option value="warn">⚠️ 주의</option>`
-      + `<option value="ok">🟢 양호</option><option value="good">🏆 우수</option><option value="done">🏁 완료</option></select></th>`;
-    return `<th class="filter"><input class="risk-fil" id="fil-${k}" type="text" placeholder="예: >=100"></th>`;
-  }).join('');
 
   document.getElementById('riskBody').innerHTML = `
-    <div class="risk-controls"><span class="muted-note" style="margin:0">※ 칸별로 필터 입력 · 숫자칸은 «>=100», «<50», «=0» 가능 · 제목 클릭 시 정렬</span></div>
+    <div class="risk-controls">
+      <label>등급:
+        <select id="riskLevelFilter">
+          <option value="">전체</option>
+          <option value="danger">🔴 심각</option>
+          <option value="warn">⚠️ 주의</option>
+          <option value="ok">🟢 양호</option>
+          <option value="good">🏆 우수</option>
+          <option value="done">🏁 완료</option>
+        </select>
+      </label>
+      <input class="risk-search" id="riskSearch" type="text" placeholder="심사원 이름 검색">
+      <span class="muted-note" style="margin:0">※ 표 머리글을 클릭하면 정렬돼요</span>
+    </div>
     <table class="risk">
-      <thead>
-        <tr>${titleRow}</tr>
-        <tr>${filterRow}</tr>
-      </thead>
+      <thead><tr>${titleRow}</tr></thead>
       <tbody id="riskTbody"></tbody>
     </table>`;
 
-  // 정렬: 제목 클릭 (필터 입력란 클릭은 제외)
   document.querySelectorAll('#riskBody th.sortable').forEach(th=>{
     th.addEventListener('click', ()=>{
       const k = th.dataset.key;
@@ -319,13 +294,8 @@ const verifiers = latest.rows.filter(r => (r.total||0) > 0).map(r => r.name);
       renderBody();
     });
   });
-  // 필터 입력 → 본문만 갱신
-  COLS.forEach(([k])=>{
-    const el = document.getElementById('fil-'+k);
-    if(!el) return;
-    el.addEventListener('input', renderBody);
-    el.addEventListener('change', renderBody);
-  });
+  document.getElementById('riskLevelFilter').addEventListener('change', renderBody);
+  document.getElementById('riskSearch').addEventListener('input', renderBody);
   renderBody();
 })();
 
