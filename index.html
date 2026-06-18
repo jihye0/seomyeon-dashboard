@@ -7,15 +7,14 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
 <style>
-  :root { --bg:#f6f4fc; --card:#fff; --line:#ece8f6; --text:#3b3552; --muted:#9c95b3;
-          --done:#5aa17a; --prog:#e0a93f; --todo:#e07b86; --accent:#8b7ff0; --accent2:#7466d6;
-          --shadow:0 1px 3px rgba(80,60,140,.05), 0 8px 24px rgba(110,90,180,.08); }
+  :root { --bg:#eef1f7; --card:#fff; --line:#e2e7f0; --text:#27314c; --muted:#8591a8;
+          --done:#2f8a63; --prog:#d4982f; --todo:#d04f57; --accent:#2f4d8f; --accent2:#1f366c;
+          --shadow:0 1px 3px rgba(25,40,80,.06), 0 8px 24px rgba(25,45,95,.08); }
   * { box-sizing:border-box; }
   body { margin:0; font-family:'Pretendard','Pretendard Variable','Segoe UI','Malgun Gothic',sans-serif;
          background:var(--bg); color:var(--text); -webkit-font-smoothing:antialiased; }
-  header { background:linear-gradient(120deg,#b9aef7 0%,#cdb6f2 50%,#e7b9e3 100%); color:#fff; padding:26px 24px 30px;
-           box-shadow:0 6px 22px rgba(150,120,210,.22); }
-  header h1, header .sub { text-shadow:0 1px 2px rgba(110,80,160,.18); }
+  header { background:linear-gradient(120deg,#26396b 0%,#16244a 100%); color:#fff; padding:26px 24px 30px;
+           box-shadow:0 6px 22px rgba(20,35,75,.25); }
   header .inner { max-width:1100px; margin:0 auto; }
   header h1 { margin:0; font-size:22px; font-weight:800; letter-spacing:-.4px; }
   header .sub { font-size:12.5px; opacity:.82; margin-top:6px; }
@@ -72,7 +71,7 @@
 <header>
   <div class="inner">
     <h1>📋 서면실사 진행현황 대시보드</h1>
-    <div class="sub">최종 업데이트 · 2026-06-18 17:00</div>
+    <div class="sub">최종 업데이트 · 2026-06-18 17:03</div>
   </div>
 </header>
 <div class="wrap">
@@ -340,14 +339,14 @@ function drawBar(){
   let datasets;
   if(metric==='total'){
     datasets = [
-      {label:'완료', data:rows.map(r=>r.completed), backgroundColor:'#8fcdaa', stack:'s'},
-      {label:'진행중', data:rows.map(r=>r.in_progress), backgroundColor:'#f3cd7e', stack:'s'},
-      {label:'미시작', data:rows.map(r=>r.not_started), backgroundColor:'#f0a6ae', stack:'s'},
+      {label:'완료', data:rows.map(r=>r.completed), backgroundColor:'#4f9e7a', stack:'s'},
+      {label:'진행중', data:rows.map(r=>r.in_progress), backgroundColor:'#e0ab4d', stack:'s'},
+      {label:'미시작', data:rows.map(r=>r.not_started), backgroundColor:'#d77a82', stack:'s'},
     ];
   } else {
     datasets = [{label: metric==='answer_rate'?'문항 입력률(%)':'건수 완료율(%)',
                  data: rows.map(r=>r[metric]),
-                 backgroundColor:'#a99cf5', borderRadius:4}];
+                 backgroundColor:'#3a5a9c', borderRadius:4}];
   }
   barChart = new Chart(ctx, {
     type:'bar',
@@ -383,8 +382,8 @@ function drawTrend(){
   trendChart = new Chart(ctx, {
     type:'line',
     data:{labels, datasets:[{label: who==='__ALL__'?'전체':who,
-            data:vals, borderColor:'#8b7ff0', backgroundColor:'rgba(139,127,240,.13)',
-            fill:true, tension:.25, pointRadius:3, pointBackgroundColor:'#8b7ff0'}]},
+            data:vals, borderColor:'#2f4d8f', backgroundColor:'rgba(47,77,143,.12)',
+            fill:true, tension:.25, pointRadius:3, pointBackgroundColor:'#2f4d8f'}]},
     options:{responsive:true,
       scales:{y:{beginAtZero:true, max: isPct?100:undefined}},
       plugins:{legend:{display:false}}}
