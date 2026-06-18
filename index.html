@@ -54,7 +54,7 @@
 <body>
 <header>
   <h1>서면실사 진행현황 대시보드</h1>
-  <div class="sub">생성: 2026-06-18 15:13</div>
+  <div class="sub">생성: 2026-06-18 15:23</div>
 </header>
 <div class="wrap">
   <div class="cards" id="cards"></div>
@@ -130,6 +130,7 @@ const verifiers = latest.rows.filter(r => (r.total||0) > 0).map(r => r.name);
 (function(){
   const DAY = 86400000;
   const TODAY = new Date(); TODAY.setHours(0,0,0,0);
+  const fmtDate = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
   const daysBetween = (a,b)=> Math.round((b-a)/DAY);
   function parseDate(s){ if(!s) return null; const d=new Date(s+'T00:00:00'); return isNaN(d)?null:d; }
 
@@ -185,9 +186,9 @@ const verifiers = latest.rows.filter(r => (r.total||0) > 0).map(r => r.name);
 
     let level, reason;
     if(remaining===0){ level='done'; reason='입력 완료'; }
-    else if(ansRate>=GOOD_RATE || score===0){ level='good'; reason = score===0 ? '일정대로 진행' : '우수 (거의 완료)'; }
     else if(score>=SCORE_DANGER){ level='danger'; reason='크게 뒤처짐'; }
     else if(score>=SCORE_WARN){ level='warn'; reason='뒤처짐'; }
+    else if(ansRate>=GOOD_RATE || score===0){ level='good'; reason = score===0 ? '일정대로 진행' : '우수 (거의 완료)'; }
     else { level='ok'; reason='양호'; }
 
     const speed = (vel[r.name]!==undefined) ? Math.round(vel[r.name]*10)/10 : null;
@@ -199,7 +200,7 @@ const verifiers = latest.rows.filter(r => (r.total||0) > 0).map(r => r.name);
   const cnt = lv => items.filter(i=>i.level===lv).length;
 
   const note = document.getElementById('riskNote');
-  note.innerHTML = `오늘 ${TODAY.toISOString().slice(0,10)} 기준 · 위험 점수 = Σ(건별 일정상 뒤처진 문항 × 마감 임박 가중치) · `
+  note.innerHTML = `오늘 ${fmtDate(TODAY)} 기준 · 위험 점수 = Σ(건별 일정상 뒤처진 문항 × 마감 임박 가중치) · `
     + `<span class="badge danger">심각 ${cnt('danger')}</span> `
     + `<span class="badge warn">주의 ${cnt('warn')}</span> `
     + `<span class="badge ok">양호 ${cnt('ok')}</span> `
