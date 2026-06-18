@@ -38,6 +38,9 @@
   tr.lv-danger { background:#fef6f5; }
   tr.lv-good, tr.lv-done { background:#f4fbf5; }
   td.score { font-weight:700; }
+  table.risk th.sortable { cursor:pointer; user-select:none; }
+  input.risk-search { padding:6px 10px; border:1px solid var(--line); border-radius:6px; font-size:14px; }
+  .risk-controls { display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-bottom:10px; }
   .badge { display:inline-block; padding:2px 8px; border-radius:999px; font-size:12px; font-weight:700; }
   .badge.danger { background:#fdecea; color:var(--todo); }
   .badge.warn   { background:#fff4e0; color:#b35a00; }
@@ -51,7 +54,7 @@
 <body>
 <header>
   <h1>서면실사 진행현황 대시보드</h1>
-  <div class="sub">생성: 2026-06-18 14:43</div>
+  <div class="sub">생성: 2026-06-18 14:50</div>
 </header>
 <div class="wrap">
   <div class="cards" id="cards"></div>
@@ -206,26 +209,94 @@ const verifiers = latest.rows.filter(r => (r.total||0) > 0).map(r => r.name);
 
   const lvLabel = {danger:'🔴 심각', warn:'⚠️ 주의', ok:'🟢 양호', good:'🏆 우수', done:'🏁 완료'};
 
+  // 정렬 가능한 컬럼: [키, 라벨, 기본 방향(asc=오름차순)]
+  const COLS = [
+    ['name',            '심사원',            true ],
+    ['level',           '등급',              false],
+    ['score',           '위험 점수',          false],
+    ['behindRemaining', '일정상<br>뒤처진 문항', false],
+    ['remaining',       '남은 문항',          false],
+    ['nearRemaining',   '임박 잔여<br>(D-7 이내)', false],
+    ['ansRate',         '입력률',            true ],
+    ['speed',           '실사 속도<br>(문항/일)', true ],
+  ];
+  const lvOrder = {danger:0, warn:1, ok:2, good:3, done:4};
+  let sortKey = 'score', sortAsc = false;
+
+  function compare(a, b){
+    let va, vb;
+    if(sortKey==='name'){ return sortAsc ? a.name.localeCompare(b.name,'ko') : b.name.localeCompare(a.name,'ko'); }
+    if(sortKey==='level'){ va=lvOrder[a.level]; vb=lvOrder[b.level]; }
+    else { va = a[sortKey]; vb = b[sortKey];
+           if(va===null||va===undefined) va = sortAsc ? Infinity : -Infinity;
+           if(vb===null||vb===undefined) vb = sortAsc ? Infinity : -Infinity; }
+    return sortAsc ? va-vb : vb-va;
+  }
+
+  function renderTable(){
+    const lvFilter = document.getElementById('riskLevelFilter').value;
+    const q = document.getElementById('riskSearch').value.trim().toLowerCase();
+    let list = items.filter(i =>
+      (lvFilter==='' || i.level===lvFilter) &&
+      (q==='' || i.name.toLowerCase().includes(q))
+    );
+    list.sort(compare);
+
+    const head = COLS.map(([k,label])=>{
+      const arrow = (k===sortKey) ? (sortAsc?' ▲':' ▼') : '';
+      return `<th class="sortable" data-key="${k}">${label}${arrow}</th>`;
+    }).join('');
+
+    document.getElementById('riskTableWrap').innerHTML = `
+      <table class="risk">
+        <thead><tr>${head}</tr></thead>
+        <tbody>
+        ${list.length===0 ? '<tr><td colspan="8" style="text-align:center;color:#888;padding:16px">해당 심사원이 없습니다</td></tr>'
+          : list.map(i=>`
+          <tr class="lv-${i.level}">
+            <td>${i.name}</td>
+            <td class="lv">${lvLabel[i.level]}</td>
+            <td class="score">${i.score}</td>
+            <td>${i.behindRemaining||0}</td>
+            <td>${i.remaining}</td>
+            <td>${i.nearRemaining||0}</td>
+            <td>${i.ansRate}%</td>
+            <td>${i.speed===null?'-':i.speed}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>`;
+
+    // 헤더 클릭 → 정렬 (같은 칸 다시 누르면 방향 토글)
+    document.querySelectorAll('#riskTableWrap th.sortable').forEach(th=>{
+      th.addEventListener('click', ()=>{
+        const k = th.dataset.key;
+        if(k===sortKey){ sortAsc = !sortAsc; }
+        else { sortKey = k; sortAsc = COLS.find(c=>c[0]===k)[2]; }
+        renderTable();
+      });
+    });
+  }
+
   document.getElementById('riskBody').innerHTML = `
-    <table class="risk">
-      <thead><tr>
-        <th>심사원</th><th>등급</th><th>위험 점수</th><th>일정상<br>뒤처진 문항</th>
-        <th>남은 문항</th><th>임박 잔여<br>(D-7 이내)</th><th>입력률</th><th>실사 속도<br>(문항/일)</th>
-      </tr></thead>
-      <tbody>
-      ${items.map(i=>`
-        <tr class="lv-${i.level}">
-          <td>${i.name}</td>
-          <td class="lv">${lvLabel[i.level]}</td>
-          <td class="score">${i.score}</td>
-          <td>${i.behindRemaining||0}</td>
-          <td>${i.remaining}</td>
-          <td>${i.nearRemaining||0}</td>
-          <td>${i.ansRate}%</td>
-          <td>${i.speed===null?'-':i.speed}</td>
-        </tr>`).join('')}
-      </tbody>
-    </table>`;
+    <div class="risk-controls">
+      <label>등급:
+        <select id="riskLevelFilter">
+          <option value="">전체</option>
+          <option value="danger">🔴 심각</option>
+          <option value="warn">⚠️ 주의</option>
+          <option value="ok">🟢 양호</option>
+          <option value="good">🏆 우수</option>
+          <option value="done">🏁 완료</option>
+        </select>
+      </label>
+      <input class="risk-search" id="riskSearch" type="text" placeholder="심사원 이름 검색">
+      <span class="muted-note" style="margin:0">※ 표 머리글을 클릭하면 정렬돼요</span>
+    </div>
+    <div id="riskTableWrap"></div>`;
+
+  document.getElementById('riskLevelFilter').addEventListener('change', renderTable);
+  document.getElementById('riskSearch').addEventListener('input', renderTable);
+  renderTable();
 })();
 
 // ── 심사원별 진행률 (가로 막대) ──
