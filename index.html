@@ -51,7 +51,7 @@
 <body>
 <header>
   <h1>서면실사 진행현황 대시보드</h1>
-  <div class="sub">생성: 2026-06-18 14:40</div>
+  <div class="sub">생성: 2026-06-18 14:43</div>
 </header>
 <div class="wrap">
   <div class="cards" id="cards"></div>
@@ -130,6 +130,20 @@ const verifiers = latest.rows.filter(r => (r.total||0) > 0).map(r => r.name);
   const daysBetween = (a,b)=> Math.round((b-a)/DAY);
   function parseDate(s){ if(!s) return null; const d=new Date(s+'T00:00:00'); return isNaN(d)?null:d; }
 
+  // 실사 속도(문항/일): 전체 기간 평균 = 지금까지 입력한 총 문항 ÷ 경과일수
+  //   (첫 기록일 ~ 오늘). 위험 판정엔 안 쓰고 참고용으로만 표시.
+  function velocityMap(){
+    const map = {};
+    if(DATA.length < 1) return map;
+    const last = DATA[DATA.length-1];
+    const lastDate = new Date(last.iso);
+    const firstDate = new Date(DATA[0].iso);
+    const days = Math.max(Math.round((lastDate-firstDate)/86400000), 1);
+    last.rows.forEach(r=>{ map[r.name] = (r.answered_q||0)/days; });
+    return map;
+  }
+  const vel = velocityMap();
+
   // 마감 임박 가중치: 마감이 가까울수록 큼 (마감일 없으면 1)
   function urgencyWeight(daysLeft){
     if(daysLeft===null) return 1;
@@ -173,7 +187,8 @@ const verifiers = latest.rows.filter(r => (r.total||0) > 0).map(r => r.name);
     else if(score>=SCORE_WARN){ level='warn'; reason='뒤처짐'; }
     else { level='ok'; reason='양호'; }
 
-    return {name:r.name, remaining, behindRemaining, nearRemaining, ansRate, score, level, reason};
+    const speed = (vel[r.name]!==undefined) ? Math.round(vel[r.name]*10)/10 : null;
+    return {name:r.name, remaining, behindRemaining, nearRemaining, ansRate, score, speed, level, reason};
   });
 
   // 위험 점수 높은 순으로 전원 정렬 (잘하는 분은 자연히 아래로)
@@ -195,7 +210,7 @@ const verifiers = latest.rows.filter(r => (r.total||0) > 0).map(r => r.name);
     <table class="risk">
       <thead><tr>
         <th>심사원</th><th>등급</th><th>위험 점수</th><th>일정상<br>뒤처진 문항</th>
-        <th>남은 문항</th><th>임박 잔여<br>(D-7 이내)</th><th>입력률</th>
+        <th>남은 문항</th><th>임박 잔여<br>(D-7 이내)</th><th>입력률</th><th>실사 속도<br>(문항/일)</th>
       </tr></thead>
       <tbody>
       ${items.map(i=>`
@@ -207,6 +222,7 @@ const verifiers = latest.rows.filter(r => (r.total||0) > 0).map(r => r.name);
           <td>${i.remaining}</td>
           <td>${i.nearRemaining||0}</td>
           <td>${i.ansRate}%</td>
+          <td>${i.speed===null?'-':i.speed}</td>
         </tr>`).join('')}
       </tbody>
     </table>`;
