@@ -5,56 +5,74 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>서면실사 진행현황</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
 <style>
-  :root { --bg:#f5f6f8; --card:#fff; --line:#e3e6ea; --text:#222; --muted:#888;
-          --done:#2e7d32; --prog:#f9a825; --todo:#c62828; --accent:#1565c0; }
+  :root { --bg:#eef1f6; --card:#fff; --line:#e7eaf0; --text:#1f2430; --muted:#8a93a3;
+          --done:#2e7d32; --prog:#f9a825; --todo:#d2433a; --accent:#2563eb; --accent2:#1e40af;
+          --shadow:0 1px 3px rgba(20,30,55,.06), 0 6px 20px rgba(20,30,55,.05); }
   * { box-sizing:border-box; }
-  body { margin:0; font-family:'Segoe UI','Malgun Gothic',sans-serif; background:var(--bg); color:var(--text); }
-  header { background:var(--accent); color:#fff; padding:18px 24px; }
-  header h1 { margin:0; font-size:20px; }
-  header .sub { font-size:12px; opacity:.85; margin-top:4px; }
-  .wrap { max-width:1100px; margin:0 auto; padding:20px; }
-  .cards { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:20px; }
-  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:16px; }
-  .card .k { font-size:12px; color:var(--muted); }
-  .card .v { font-size:26px; font-weight:700; margin-top:6px; }
-  .panel { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:18px; margin-bottom:20px; }
-  .panel h2 { font-size:15px; margin:0 0 14px; }
-  .row { display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-bottom:12px; }
-  select { padding:6px 10px; border:1px solid var(--line); border-radius:6px; font-size:14px; }
+  body { margin:0; font-family:'Pretendard','Pretendard Variable','Segoe UI','Malgun Gothic',sans-serif;
+         background:var(--bg); color:var(--text); -webkit-font-smoothing:antialiased; }
+  header { background:linear-gradient(120deg,#2563eb 0%,#1e3a8a 100%); color:#fff; padding:26px 24px 30px;
+           box-shadow:0 4px 18px rgba(30,58,138,.18); }
+  header .inner { max-width:1100px; margin:0 auto; }
+  header h1 { margin:0; font-size:22px; font-weight:800; letter-spacing:-.4px; }
+  header .sub { font-size:12.5px; opacity:.82; margin-top:6px; }
+  .wrap { max-width:1100px; margin:0 auto; padding:22px 20px 40px; }
+  .cards { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin:-44px 0 22px; }
+  .card { background:var(--card); border-radius:14px; padding:18px 18px 16px; box-shadow:var(--shadow);
+          border:1px solid rgba(231,234,240,.7); transition:transform .15s ease, box-shadow .15s ease; }
+  .card:hover { transform:translateY(-2px); box-shadow:0 4px 10px rgba(20,30,55,.08),0 12px 28px rgba(20,30,55,.08); }
+  .card .k { font-size:12px; color:var(--muted); font-weight:600; }
+  .card .v { font-size:30px; font-weight:800; margin-top:8px; letter-spacing:-1px; color:var(--accent2); }
+  .panel { background:var(--card); border-radius:16px; padding:22px; margin-bottom:22px; box-shadow:var(--shadow);
+           border:1px solid rgba(231,234,240,.7); }
+  .panel h2 { font-size:16px; margin:0 0 16px; font-weight:800; letter-spacing:-.3px; }
+  .row { display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-bottom:14px; }
+  select, input.risk-search { padding:7px 11px; border:1px solid var(--line); border-radius:9px; font-size:14px;
+           background:#fff; color:var(--text); font-family:inherit; outline:none; transition:border-color .12s; }
+  select:focus, input.risk-search:focus { border-color:var(--accent); }
   canvas { max-height:420px; }
   #byVerifierWrap { position:relative; width:100%; }
   #byVerifierWrap canvas { max-height:none; }
-  table.risk { width:100%; border-collapse:collapse; font-size:13px; }
-  table.risk th, table.risk td { padding:7px 10px; border-bottom:1px solid var(--line); text-align:right; white-space:nowrap; }
-  table.risk th { color:var(--muted); font-weight:600; text-align:right; background:#fafbfc; }
-  table.risk th:first-child, table.risk td:first-child { text-align:left; }
-  table.risk td.lv { text-align:center; font-weight:700; }
-  tr.lv-danger td.lv { color:var(--todo); }
-  tr.lv-warn   td.lv { color:#e07a00; }
-  tr.lv-ok     td.lv { color:#607d8b; }
-  tr.lv-good   td.lv { color:var(--accent); }
-  tr.lv-done   td.lv { color:var(--done); }
-  tr.lv-danger { background:#fef6f5; }
-  tr.lv-good, tr.lv-done { background:#f4fbf5; }
-  td.score { font-weight:700; }
+  table.risk { width:100%; border-collapse:separate; border-spacing:0; font-size:13px; }
+  table.risk th, table.risk td { padding:9px 11px; border-bottom:1px solid var(--line); text-align:right; white-space:nowrap; }
+  table.risk thead th { position:sticky; top:0; color:var(--muted); font-weight:700; font-size:12px; text-align:right;
+           background:#f7f9fc; border-bottom:2px solid var(--line); z-index:1; }
+  table.risk th:first-child, table.risk td:first-child { text-align:left; padding-left:14px; }
+  table.risk td:first-child { font-weight:700; }
+  table.risk tbody tr { transition:background .1s; }
+  table.risk tbody tr:hover { background:#f1f5ff !important; }
+  table.risk td.lv { text-align:center; }
+  td.lv span.pill { display:inline-block; padding:3px 10px; border-radius:999px; font-size:12px; font-weight:700; }
+  tr.lv-danger td.lv span.pill { background:#fdecea; color:var(--todo); }
+  tr.lv-warn   td.lv span.pill { background:#fff3e0; color:#c2410c; }
+  tr.lv-ok     td.lv span.pill { background:#eef1f5; color:#5b6675; }
+  tr.lv-good   td.lv span.pill { background:#e7f0fe; color:var(--accent); }
+  tr.lv-done   td.lv span.pill { background:#e8f5e9; color:var(--done); }
+  tr.lv-danger { background:#fffaf9; }
+  tr.lv-good, tr.lv-done { background:#f6fcf7; }
+  td.score { font-weight:800; color:var(--accent2); }
+  tr.lv-danger td.score { color:var(--todo); }
   table.risk th.sortable { cursor:pointer; user-select:none; }
-  .risk-controls { display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-bottom:10px; }
-  input.risk-search { padding:6px 10px; border:1px solid var(--line); border-radius:6px; font-size:14px; }
-  .badge { display:inline-block; padding:2px 8px; border-radius:999px; font-size:12px; font-weight:700; }
+  table.risk th.sortable:hover { color:var(--accent); }
+  .risk-controls { display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-bottom:12px; }
+  .badge { display:inline-block; padding:3px 10px; border-radius:999px; font-size:12px; font-weight:700; }
   .badge.danger { background:#fdecea; color:var(--todo); }
-  .badge.warn   { background:#fff4e0; color:#b35a00; }
-  .badge.ok     { background:#eceff1; color:#546e7a; }
-  .badge.good   { background:#e7f0fb; color:var(--accent); }
+  .badge.warn   { background:#fff3e0; color:#c2410c; }
+  .badge.ok     { background:#eef1f5; color:#5b6675; }
+  .badge.good   { background:#e7f0fe; color:var(--accent); }
   .badge.done   { background:#e8f5e9; color:var(--done); }
-  .muted-note { font-size:12px; color:var(--muted); margin:-6px 0 12px; }
-  @media(max-width:700px){ .cards{grid-template-columns:repeat(2,1fr);} }
+  .muted-note { font-size:12px; color:var(--muted); margin:-4px 0 14px; line-height:1.7; }
+  @media(max-width:700px){ .cards{grid-template-columns:repeat(2,1fr); margin-top:-40px;} .wrap{padding:18px 14px 30px;} }
 </style>
 </head>
 <body>
 <header>
-  <h1>서면실사 진행현황 대시보드</h1>
-  <div class="sub">생성: 2026-06-18 15:44</div>
+  <div class="inner">
+    <h1>📋 서면실사 진행현황 대시보드</h1>
+    <div class="sub">최종 업데이트 · 2026-06-18 16:58</div>
+  </div>
 </header>
 <div class="wrap">
   <div class="cards" id="cards"></div>
@@ -247,7 +265,7 @@ const verifiers = latest.rows.filter(r => (r.total||0) > 0).map(r => r.name);
       : list.map(i=>`
         <tr class="lv-${i.level}">
           <td>${i.name}</td>
-          <td class="lv">${lvLabel[i.level]}</td>
+          <td class="lv"><span class="pill">${lvLabel[i.level]}</span></td>
           <td class="score">${i.score}</td>
           <td>${i.remaining}</td>
           <td>${i.nearRemaining||0}</td>
