@@ -54,7 +54,7 @@
 <body>
 <header>
   <h1>서면실사 진행현황 대시보드</h1>
-  <div class="sub">생성: 2026-06-18 14:56</div>
+  <div class="sub">생성: 2026-06-18 15:13</div>
 </header>
 <div class="wrap">
   <div class="cards" id="cards"></div>
@@ -214,7 +214,6 @@ const verifiers = latest.rows.filter(r => (r.total||0) > 0).map(r => r.name);
     ['name',            '심사원',            true ],
     ['level',           '등급',              false],
     ['score',           '위험 점수',          false],
-    ['behindRemaining', '일정상<br>뒤처진 문항', false],
     ['remaining',       '남은 문항',          false],
     ['nearRemaining',   '임박 잔여<br>(D-7 이내)', false],
     ['ansRate',         '입력률',            true ],
@@ -249,7 +248,6 @@ const verifiers = latest.rows.filter(r => (r.total||0) > 0).map(r => r.name);
           <td>${i.name}</td>
           <td class="lv">${lvLabel[i.level]}</td>
           <td class="score">${i.score}</td>
-          <td>${i.behindRemaining||0}</td>
           <td>${i.remaining}</td>
           <td>${i.nearRemaining||0}</td>
           <td>${i.ansRate}%</td>
