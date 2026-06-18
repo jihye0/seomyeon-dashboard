@@ -32,10 +32,18 @@
   table.risk td.lv { text-align:center; font-weight:700; }
   tr.lv-danger td.lv { color:var(--todo); }
   tr.lv-warn   td.lv { color:#e07a00; }
-  tr.lv-ok     td.lv { color:var(--done); }
+  tr.lv-ok     td.lv { color:#607d8b; }
+  tr.lv-good   td.lv { color:var(--accent); }
+  tr.lv-done   td.lv { color:var(--done); }
+  tr.lv-danger { background:#fef6f5; }
+  tr.lv-good, tr.lv-done { background:#f4fbf5; }
+  td.score { font-weight:700; }
   .badge { display:inline-block; padding:2px 8px; border-radius:999px; font-size:12px; font-weight:700; }
   .badge.danger { background:#fdecea; color:var(--todo); }
   .badge.warn   { background:#fff4e0; color:#b35a00; }
+  .badge.ok     { background:#eceff1; color:#546e7a; }
+  .badge.good   { background:#e7f0fb; color:var(--accent); }
+  .badge.done   { background:#e8f5e9; color:var(--done); }
   .muted-note { font-size:12px; color:var(--muted); margin:-6px 0 12px; }
   @media(max-width:700px){ .cards{grid-template-columns:repeat(2,1fr);} }
 </style>
@@ -43,13 +51,13 @@
 <body>
 <header>
   <h1>서면실사 진행현황 대시보드</h1>
-  <div class="sub">생성: 2026-06-18 13:13</div>
+  <div class="sub">생성: 2026-06-18 13:38</div>
 </header>
 <div class="wrap">
   <div class="cards" id="cards"></div>
 
   <div class="panel" id="riskPanel">
-    <h2>⚠️ 마감 리스크 (기간 내 완료 위험)</h2>
+    <h2>심사원 진행 현황 &amp; 위험도</h2>
     <div class="muted-note" id="riskNote"></div>
     <div id="riskBody"></div>
   </div>
@@ -115,35 +123,28 @@ const verifiers = latest.rows.filter(r => (r.total||0) > 0).map(r => r.name);
     ([k,v])=>`<div class="card"><div class="k">${k}</div><div class="v">${v}</div></div>`).join('');
 })();
 
-// ── 마감 리스크 (기간 내 완료 위험) ──
+// ── 진행 현황 & 위험도 (남은 문항 × 마감 임박 가중치) ──
 (function(){
   const DAY = 86400000;
   const TODAY = new Date(); TODAY.setHours(0,0,0,0);
   const daysBetween = (a,b)=> Math.round((b-a)/DAY);
   function parseDate(s){ if(!s) return null; const d=new Date(s+'T00:00:00'); return isNaN(d)?null:d; }
 
-  // 최근 실제 입력 속도(문항/일): 최신 스냅샷과 약 3일 전(없으면 가장 오래된) 스냅샷의 answered_q 증가량 ÷ 경과일
-  function velocityMap(){
-    const map = {};
-    if(DATA.length < 2) return map;
-    const last = DATA[DATA.length-1];
-    const lastDate = new Date(last.iso);
-    let base = DATA[0];
-    for(let i=DATA.length-2; i>=0; i--){
-      base = DATA[i];
-      if(daysBetween(new Date(DATA[i].iso), lastDate) >= 3) break;
-    }
-    const days = Math.max(daysBetween(new Date(base.iso), lastDate), 0.5);
-    const baseMap = {};
-    base.rows.forEach(r=> baseMap[r.name] = r.answered_q||0);
-    last.rows.forEach(r=>{
-      if(baseMap[r.name]===undefined) return;
-      map[r.name] = Math.max((r.answered_q||0)-baseMap[r.name], 0)/days;
-    });
-    return map;
+  // 마감 임박 가중치: 마감이 가까울수록 큼 (마감일 없으면 1)
+  function urgencyWeight(daysLeft){
+    if(daysLeft===null) return 1;
+    if(daysLeft < 0)  return 5;   // 기한 초과
+    if(daysLeft <= 3) return 4;   // D-1 ~ D-3
+    if(daysLeft <= 7) return 2;   // D-4 ~ D-7
+    if(daysLeft <= 14) return 1;  // D-8 ~ D-14
+    return 0.5;                   // D-15 이상
   }
-  const vel = velocityMap();
-  const haveVel = Object.keys(vel).length>0;
+
+  // 등급 경계 (위험 점수 기준) — 필요시 이 숫자만 바꾸면 됨
+  const SCORE_DANGER = 400;
+  const SCORE_WARN   = 200;
+  const GOOD_RATE    = 80;   // 입력률 이상이면 '우수'
+
   const haveDeadline = latest.rows.some(r=>r.deadline);
 
   const items = latest.rows.filter(r=>(r.total||0)>0).map(r=>{
@@ -151,74 +152,53 @@ const verifiers = latest.rows.filter(r => (r.total||0) > 0).map(r => r.name);
     const ansRate = rate(r.answered_q, r.total_q);
     const dl = parseDate(r.deadline);
     const daysLeft = dl ? daysBetween(TODAY, dl) : null;
-    const required = (daysLeft!==null && daysLeft>0) ? remaining/daysLeft : null;
-    const actual = haveVel ? (vel[r.name]||0) : null;
+    const weight = urgencyWeight(daysLeft);
+    const score = Math.round(remaining * weight);
 
-    // 마감 임박 기준일(D-5 이내) — 이 안쪽이면 같은 상황도 한 단계 더 심각하게 본다
-    const NEAR = 5;
-    const near = (daysLeft!==null && daysLeft<=NEAR);
-    let level='ok', reason='완료/정상';
+    // 등급: 완료 / 우수(거의 다 함) / 점수 기반 심각·주의·양호
+    let level, reason;
+    if(remaining===0){ level='done'; reason='입력 완료'; }
+    else if(ansRate>=GOOD_RATE){ level='good'; reason='우수 (거의 완료)'; }
+    else if(score>=SCORE_DANGER){ level='danger'; reason='심각'; }
+    else if(score>=SCORE_WARN){ level='warn'; reason='주의'; }
+    else { level='ok'; reason='양호'; }
 
-    if(remaining===0){ level='ok'; reason='입력 완료'; }
-    else if(daysLeft!==null && daysLeft<0){ level='danger'; reason='기한 초과'; }
-    else if((r.answered_q||0)===0){
-      // 착수 전: 마감 임박이면 심각, 여유 있으면 주의
-      level = near ? 'danger' : 'warn'; reason = near ? '착수 전·마감 임박' : '착수 전';
-    }
-    else if(required!==null && actual!==null){
-      if(actual<=0){
-        // 최근 진척 없음: 마감 임박이면 심각, 여유 있으면 주의
-        level = near ? 'danger' : 'warn'; reason = near ? '진척 없음·마감 임박' : '최근 진척 없음';
-      } else if(required/actual >= 1.5){ level='danger'; reason='속도 크게 부족'; }
-      else if(actual < required){ level='warn'; reason='속도 부족'; }
-    }
-    else if(near && ansRate<60){
-      // 마감일은 있으나 속도 계산 불가(스냅샷 부족) — 마감 임박 + 진척 낮으면 주의
-      level='warn'; reason='마감 임박';
-    }
-    return {name:r.name, remaining, ansRate, deadline:r.deadline, daysLeft, required, actual, level, reason};
+    return {name:r.name, remaining, ansRate, deadline:r.deadline, daysLeft, weight, score, level, reason};
   });
 
-  const order = {danger:0, warn:1, ok:2};
-  const flagged = items.filter(i=>i.level!=='ok')
-      .sort((a,b)=> order[a.level]-order[b.level] || (a.daysLeft??999)-(b.daysLeft??999));
-  const nDanger = flagged.filter(i=>i.level==='danger').length;
-  const nWarn   = flagged.filter(i=>i.level==='warn').length;
+  // 위험 점수 높은 순으로 전원 정렬 (잘하는 분은 자연히 아래로)
+  items.sort((a,b)=> b.score-a.score);
+  const cnt = lv => items.filter(i=>i.level===lv).length;
 
   const note = document.getElementById('riskNote');
-  note.innerHTML = `오늘 ${TODAY.toISOString().slice(0,10)} 기준 · `
-    + `<span class="badge danger">심각 ${nDanger}명</span> `
-    + `<span class="badge warn">주의 ${nWarn}명</span>`
-    + (haveDeadline ? '' : ' · ⚠️ 아직 마감일 데이터가 없어 «착수 전»만 표시됩니다 (다음 자동 업데이트부터 마감 기준 계산)')
-    + (haveVel ? '' : ' · 진행 속도는 스냅샷이 2개 이상 쌓이면 계산됩니다');
+  note.innerHTML = `오늘 ${TODAY.toISOString().slice(0,10)} 기준 · 위험 점수 = 남은 문항 × 마감 임박 가중치 · `
+    + `<span class="badge danger">심각 ${cnt('danger')}</span> `
+    + `<span class="badge warn">주의 ${cnt('warn')}</span> `
+    + `<span class="badge ok">양호 ${cnt('ok')}</span> `
+    + `<span class="badge good">우수 ${cnt('good')}</span> `
+    + `<span class="badge done">완료 ${cnt('done')}</span>`
+    + (haveDeadline ? '' : ' · ⚠️ 아직 마감일 데이터가 없어 가중치 1로 계산됩니다 (다음 자동 업데이트부터 반영)');
 
-  const body = document.getElementById('riskBody');
-  if(flagged.length===0){
-    body.innerHTML = '<div class="muted-note">✅ 현재 위험 신호가 있는 심사원이 없습니다.</div>';
-    return;
-  }
-  const fmt = x => x===null ? '-' : (Math.round(x*10)/10);
+  const lvLabel = {danger:'🔴 심각', warn:'⚠️ 주의', ok:'🟢 양호', good:'🏆 우수', done:'🏁 완료'};
   const dday = i => i.daysLeft===null ? '-' : (i.daysLeft<0 ? `D+${-i.daysLeft}` : `D-${i.daysLeft}`);
-  const lvLabel = {danger:'🔴 심각', warn:'⚠️ 주의'};
-  body.innerHTML = `
+
+  document.getElementById('riskBody').innerHTML = `
     <table class="risk">
       <thead><tr>
-        <th>심사원</th><th>등급</th><th>사유</th><th>남은 문항</th>
-        <th>입력률</th><th>마감일</th><th>D-day</th>
-        <th>필요속도<br>(문항/일)</th><th>실제속도<br>(문항/일)</th>
+        <th>심사원</th><th>등급</th><th>위험 점수</th><th>남은 문항</th>
+        <th>입력률</th><th>마감일</th><th>D-day</th><th>가중치</th>
       </tr></thead>
       <tbody>
-      ${flagged.map(i=>`
+      ${items.map(i=>`
         <tr class="lv-${i.level}">
           <td>${i.name}</td>
           <td class="lv">${lvLabel[i.level]}</td>
-          <td>${i.reason}</td>
+          <td class="score">${i.score}</td>
           <td>${i.remaining}</td>
           <td>${i.ansRate}%</td>
           <td>${i.deadline||'-'}</td>
           <td>${dday(i)}</td>
-          <td>${fmt(i.required)}</td>
-          <td>${i.actual===null?'-':fmt(i.actual)}</td>
+          <td>×${i.weight}</td>
         </tr>`).join('')}
       </tbody>
     </table>`;
