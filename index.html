@@ -225,7 +225,7 @@ const verifiers = latest.rows.filter(r => (r.total||0) > 0).map(r => r.name);
       else { level='ok'; reason='양호'; }
 
       const speed = (vel[r.name]!==undefined) ? Math.round(vel[r.name]*10)/10 : null;
-      return {name:r.name, remaining, behindRemaining, nearRemaining, overdueRem, ansRate, score, speed, level, reason};
+      return {name:r.name, assigned:r.total||0, remaining, behindRemaining, nearRemaining, overdueRem, ansRate, score, speed, level, reason};
     }).filter(Boolean);
   }
 
@@ -248,6 +248,7 @@ const verifiers = latest.rows.filter(r => (r.total||0) > 0).map(r => r.name);
   const COLS = [
     ['name',            '심사원',            true ],
     ['level',           '등급',              false],
+    ['assigned',        '배정 건수',          false],
     ['score',           '위험 점수',          false],
     ['remaining',       '남은 문항',          false],
     ['nearRemaining',   '임박 잔여<br>(D-3 이내)', false],
@@ -286,6 +287,7 @@ const verifiers = latest.rows.filter(r => (r.total||0) > 0).map(r => r.name);
         <tr class="lv-${i.level}">
           <td>${i.name}${i.overdueRem>0 ? ` <span class="overdue-dot" style="cursor:help;font-size:11px" title="기한 초과 미완료 ${i.overdueRem}문항">🔴</span>` : ''}</td>
           <td class="lv"><span class="pill">${lvLabel[i.level]}</span></td>
+          <td>${i.assigned||0}</td>
           <td class="score">${i.score}</td>
           <td>${i.remaining}</td>
           <td>${i.nearRemaining||0}</td>
