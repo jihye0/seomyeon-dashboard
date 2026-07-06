@@ -270,8 +270,12 @@ const verifiers = latest.rows.filter(r => (r.total||0) > 0).map(r => r.name);
   function renderBody(){
     const lvFilter = document.getElementById('riskLevelFilter').value;
     const q = document.getElementById('riskSearch').value.trim().toLowerCase();
+    // '추가 배정 후보' = 기한초과 0 & 위험 낮음(≤3, 일정 앞섬) & 입력률 높음(≥60%)
+    const isSpare = i => i.overdueRem===0 && i.score<=3 && i.ansRate>=60;
     let list = currentItems.filter(i =>
-      (lvFilter==='' || i.level===lvFilter) &&
+      (lvFilter===''      ? true
+       : lvFilter==='spare' ? isSpare(i)
+       : i.level===lvFilter) &&
       (q==='' || i.name.toLowerCase().includes(q))
     );
     list.sort(compare);
@@ -316,6 +320,7 @@ const verifiers = latest.rows.filter(r => (r.total||0) > 0).map(r => r.name);
           <option value="ok">🟢 양호</option>
           <option value="good">🏆 우수</option>
           <option value="done">🏁 완료</option>
+          <option value="spare">➕ 추가 배정 후보</option>
         </select>
       </label>
       <input class="risk-search" id="riskSearch" type="text" placeholder="심사원 이름 검색">
