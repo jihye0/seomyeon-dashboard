@@ -147,7 +147,8 @@ const verifiers = latest.rows.filter(r => (r.total||0) > 0).map(r => r.name);
 // ── 진행 현황 & 위험도 (남은 문항 × 마감 임박 가중치) ──
 (function(){
   const DAY = 86400000;
-  const TODAY = new Date(); TODAY.setHours(0,0,0,0);
+  // 위험 점수 기준일 = 데이터 최종 업데이트 날짜 (최종 업데이트와 항상 일치)
+  const TODAY = new Date('2026-07-06' + 'T00:00:00'); TODAY.setHours(0,0,0,0);
   const fmtDate = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
   const daysBetween = (a,b)=> Math.round((b-a)/DAY);
   function parseDate(s){ if(!s) return null; const d=new Date(s+'T00:00:00'); return isNaN(d)?null:d; }
