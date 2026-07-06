@@ -178,8 +178,9 @@ const verifiers = latest.rows.filter(r => (r.total||0) > 0).map(r => r.name);
   }
 
   // 등급 경계 (위험 점수 기준) — 필요시 이 숫자만 바꾸면 됨
-  const SCORE_DANGER = 200;
-  const SCORE_WARN   = 60;
+  // 위험 점수 = 배정량 대비 임박 가중 뒤처짐 비율(%). 규모 편향 없음.
+  const SCORE_DANGER = 10;
+  const SCORE_WARN   = 6;
   const GOOD_RATE    = 80;   // 입력률 이상이면 '우수'
 
   const haveBreakdown = latest.rows.some(r=> r.dl_break && Object.keys(r.dl_break).length>0);
@@ -203,16 +204,18 @@ const verifiers = latest.rows.filter(r => (r.total||0) > 0).map(r => r.name);
 
       // 위험 점수 = Σ (건별 '일정상 뒤처진 문항' short × 마감 임박 가중치)
       const bd = s.dl_break || {};
-      let score = 0, behindRemaining = 0, nearRemaining = 0;
+      let score = 0, behindRemaining = 0, nearRemaining = 0, overdueRem = 0;
       for(const d in bd){
         const cell = bd[d] || {rem:0, short:0};
         const dl = parseDate(d);
         const daysLeft = dl ? daysBetween(TODAY, dl) : null;
         score += (cell.short||0) * urgencyWeight(daysLeft);
         behindRemaining += (cell.short||0);
-        if(daysLeft!==null && daysLeft<=7) nearRemaining += (cell.rem||0);
+        if(daysLeft!==null && daysLeft<=3) nearRemaining += (cell.rem||0);
+        if(daysLeft!==null && daysLeft<0)  overdueRem += (cell.rem||0);  // 기한 초과 미완료
       }
-      score = Math.round(score);
+      // 배정량 대비 비율로 정규화 (×100) — 배정 크기가 큰 사람이 불리하던 편향 제거
+      score = s.total_q > 0 ? Math.round(score / s.total_q * 1000) / 10 : 0;
 
       let level, reason;
       if(remaining===0){ level='done'; reason='입력 완료'; }
@@ -222,7 +225,7 @@ const verifiers = latest.rows.filter(r => (r.total||0) > 0).map(r => r.name);
       else { level='ok'; reason='양호'; }
 
       const speed = (vel[r.name]!==undefined) ? Math.round(vel[r.name]*10)/10 : null;
-      return {name:r.name, remaining, behindRemaining, nearRemaining, ansRate, score, speed, level, reason};
+      return {name:r.name, remaining, behindRemaining, nearRemaining, overdueRem, ansRate, score, speed, level, reason};
     }).filter(Boolean);
   }
 
@@ -230,7 +233,7 @@ const verifiers = latest.rows.filter(r => (r.total||0) > 0).map(r => r.name);
   const note = document.getElementById('riskNote');
   function updateNote(){
     const cnt = lv => currentItems.filter(i=>i.level===lv).length;
-    note.innerHTML = `오늘 ${fmtDate(TODAY)} 기준 · 위험 점수 = Σ(건별 일정상 뒤처진 문항 × 마감 임박 가중치) · `
+    note.innerHTML = `오늘 ${fmtDate(TODAY)} 기준 · 위험 점수 = Σ(건별 일정상 뒤처진 문항 × 마감 임박 가중치) ÷ 배정 문항 × 100 (배정량 대비 비율) · `
       + `<span class="badge danger">심각 ${cnt('danger')}</span> `
       + `<span class="badge warn">주의 ${cnt('warn')}</span> `
       + `<span class="badge ok">양호 ${cnt('ok')}</span> `
@@ -247,7 +250,7 @@ const verifiers = latest.rows.filter(r => (r.total||0) > 0).map(r => r.name);
     ['level',           '등급',              false],
     ['score',           '위험 점수',          false],
     ['remaining',       '남은 문항',          false],
-    ['nearRemaining',   '임박 잔여<br>(D-7 이내)', false],
+    ['nearRemaining',   '임박 잔여<br>(D-3 이내)', false],
     ['ansRate',         '입력률',            true ],
     ['speed',           '실사 속도<br>(문항/일)', true ],
   ];
@@ -277,7 +280,7 @@ const verifiers = latest.rows.filter(r => (r.total||0) > 0).map(r => r.name);
       list.length===0 ? `<tr><td colspan="${COLS.length}" style="text-align:center;color:#888;padding:16px">조건에 맞는 심사원이 없습니다</td></tr>`
       : list.map(i=>`
         <tr class="lv-${i.level}">
-          <td>${i.name}</td>
+          <td>${i.name}${i.overdueRem>0 ? ` <span class="overdue-dot" style="cursor:help;font-size:11px" title="기한 초과 미완료 ${i.overdueRem}문항">🔴</span>` : ''}</td>
           <td class="lv"><span class="pill">${lvLabel[i.level]}</span></td>
           <td class="score">${i.score}</td>
           <td>${i.remaining}</td>
